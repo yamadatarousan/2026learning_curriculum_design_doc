@@ -40,23 +40,34 @@ func PrintArea(s Shape) {
 }
 
 func main() {
-  rect1 := Rectangle{Width: 10, Height: 5}
-  rect2 := Rectangle{Width: 20, Height: 5}
-  circ1 := Circle{Radius: 4}
-  circ2 := Circle{Radius: 8}
+    rect1 := Rectangle{Width: 10, Height: 5}
+    rect2 := Rectangle{Width: 20, Height: 5}
+    circ1 := Circle{Radius: 4}
+    circ2 := Circle{Radius: 8}
 
-  PrintArea(rect1)
-  PrintArea(rect2)
-  PrintArea(circ1)
-  PrintArea(circ2)
+    // 【変更点①】ループの中でまとめて処理するので、個別の呼び出しは不要になります
+    // PrintArea(rect1)
+    // ...
 
-  shapes := []Shape{rect1, circ1, rect2, circ2}
-  var totalArea float64
-  for _, s := range shapes {
-    fmt.Printf("Area from slice: %f\n", s.Area())
-    fmt.Printf("Perimeter from slice: %f\n", s.Perimeter())
-    totalArea += s.Area()
+    shapes := []Shape{rect1, circ1, rect2, circ2}
+
+    // 【変更点②】合計面積を保存する変数をループの前に用意
+    var totalArea float64
+
+    fmt.Println("--- Shape Calculation Results ---")
+
+    // ループ処理
+    for _, s := range shapes {
+        // 【変更点③】面積と周囲長の両方を表示
+        // fmt.Printf("%T\n", s) を使うと具体的な型（RectangleかCircleか）も表示できます
+        fmt.Printf("Shape type: %T, Area: %f, Perimeter: %f\n", s, s.Area(), s.Perimeter())
+
+        // 【変更点④】合計面積に現在の図形の面積を加算
+        totalArea += s.Area()
+    }
+
+    fmt.Println("---------------------------------")
+
+    // 【変更点⑤】ループの後に、計算した合計面積を表示
+    fmt.Printf("Total area of all shapes: %f\n", totalArea)
   }
-
-  fmt.Printf("totalArea: %f\n", totalArea)
-}
