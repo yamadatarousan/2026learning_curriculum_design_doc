@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS todo_audit_logs (
+    id SERIAL PRIMARY KEY,
+    todo_id INTEGER NOT NULL,
+    operation VARCHAR(10) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
