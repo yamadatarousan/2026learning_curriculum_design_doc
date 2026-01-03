@@ -109,17 +109,17 @@ func setupTestRouter(dbConn *sql.DB) *gin.Engine {
 func TestUserFlow(t *testing.T) {
 	// グローバルなtestDB接続を使ってルーターをセットアップ
 	router := setupTestRouter(testDB)
-
+	
 	// --- 1. 新規登録 ---
 	// DBはテストごとにまっさらなので、安心してユーザーを作成できる
 	signupBody := `{"email": "isolated-test@example.com", "password": "password123"}`
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/signup", bytes.NewBufferString(signupBody))
 	req.Header.Set("Content-Type", "application/json")
-
+	
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusCreated, w.Code)
-
+	
 	// --- 2. ログイン ---
 	loginBody := `{"email": "isolated-test@example.com", "password": "password123"}`
 	w = httptest.NewRecorder()

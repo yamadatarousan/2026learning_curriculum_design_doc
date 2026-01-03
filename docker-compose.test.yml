@@ -1,0 +1,14 @@
+services:
+  test_db:
+    image: postgres:15-alpine
+    ports:
+      - "5434:5432" # 開発用DBとポートを分ける
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=todo_test_db # DB名も開発用と分ける
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d todo_test_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
