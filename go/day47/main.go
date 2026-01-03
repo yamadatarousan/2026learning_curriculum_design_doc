@@ -9,6 +9,8 @@ import (
   "net/http"
   "os"
   "os/signal"
+  "strconv"
+  "strings"
   "syscall"
   "time"
 
@@ -24,6 +26,7 @@ import (
 type Todo struct {
   ID   int    `json:"id"`
   Name string `json:"name" binding:"required"`
+  UserID int    `json:"user_id"`
 }
 
 type User struct {
@@ -34,8 +37,50 @@ type User struct {
 }
 
 var db *sql.DB
-
 var jwtSecret = []byte("a-very-secret-key")
+
+func authMiddleware() gin.HandlerFunc {
+  return func(c *gin.Context) {
+    authHeader := c.GetHeader("Authorization")
+    if authHeader == "" {
+      c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is missing"})
+      return
+    }
+
+    // "Bearer <token>" という形式を期待
+    parts := strings.Split(authHeader, " ")
+    if len(parts) != 2 || parts[0] != "Bearer" {
+      c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is malformed"})
+      return
+    }
+    tokenString := parts[1]
+
+    token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+      if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+         return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+      }
+      return jwtSecret, nil
+    })
+
+    if err != nil {
+      c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token", "details": err.Error()})
+      return
+    }
+
+    if claims, ok := token.Claims.(*jwt.RegisteredClaims); ok && token.Valid {
+      userID, err := strconv.Atoi(claims.Subject)
+      if err != nil {
+        c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID in token"})
+        return
+      }
+      // コンテキストにユーザーIDを保存
+      c.Set("userID", userID)
+      c.Next()
+    } else {
+      c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+    }
+  }
+}
 
 type AppHandler func(c *gin.Context) error
 
@@ -92,7 +137,8 @@ func NewTodoHandler(repo *TodoRepository) *TodoHandler {
 }
 
 func (h *TodoHandler) getTodos(c *gin.Context) error {
-  todos, err := h.repo.FindAll()
+  userID := c.GetInt("userID") // ミドルウェアからユーザーIDを取得
+  todos, err := h.repo.FindAll(userID)
   if err != nil {
     return err
   }
@@ -105,6 +151,9 @@ func (h *TodoHandler) createTodo(c *gin.Context) error {
   if err := c.BindJSON(&newTodo); err != nil {
     return err
   }
+
+  userID := c.GetInt("userID") // ミドルウェアからユーザーIDを取得
+  newTodo.UserID = userID      // TODOにユーザーIDをセット
 
   createdTodo, err := h.repo.CreateTodoWithAudit(c.Request.Context(), newTodo)
   if err != nil {
@@ -252,12 +301,15 @@ func main() {
   router.GET("/health", func(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"status": "ok"})
   })
-
   router.POST("/signup", errorHandler(authHandler.signup))
   router.POST("/login", errorHandler(authHandler.login))
 
-  router.GET("/todos", errorHandler(todoHandler.getTodos))
-  router.POST("/todos", errorHandler(todoHandler.createTodo))
+  v1 := router.Group("/api/v1")
+  v1.Use(authMiddleware()) // このグループのルートは認証ミドルウェアを通る
+  {
+    v1.GET("/todos", errorHandler(todoHandler.getTodos))
+    v1.POST("/todos", errorHandler(todoHandler.createTodo))
+  }
 
   // --- Graceful Shutdownの実装 ---
   

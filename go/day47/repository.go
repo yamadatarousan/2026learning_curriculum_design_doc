@@ -14,8 +14,8 @@ func NewTodoRepository(db *sql.DB) *TodoRepository {
   return &TodoRepository{db: db}
 }
 
-func (r *TodoRepository) FindAll() ([]Todo, error) {
-  rows, err := r.db.Query("SELECT id, name FROM todos")
+func (r *TodoRepository) FindAll(userID int) ([]Todo, error) {
+  rows, err := r.db.Query("SELECT id, name, user_id FROM todos WHERE user_id = $1", userID)
   if err != nil {
     return nil, err
   }
@@ -24,7 +24,7 @@ func (r *TodoRepository) FindAll() ([]Todo, error) {
   var todos []Todo
   for rows.Next() {
     var t Todo
-    if err := rows.Scan(&t.ID, &t.Name); err != nil {
+    if err := rows.Scan(&t.ID, &t.Name, &t.UserID); err != nil {
       return nil, err
     }
     todos = append(todos, t)
@@ -58,7 +58,7 @@ func (r *TodoRepository) execTx(ctx context.Context, fn func(*sql.Tx) error) err
 func (r *TodoRepository) createTodoInTx(tx *sql.Tx, todo Todo) (Todo, error) {
   // 1. todosテーブルに新しいTODOを挿入し、IDを取得
   var id int
-  err := tx.QueryRow("INSERT INTO todos (name) VALUES ($1) RETURNING id", todo.Name).Scan(&id)
+  err := tx.QueryRow("INSERT INTO todos (name, user_id) VALUES ($1, $2) RETURNING id", todo.Name, todo.UserID).Scan(&id)
   if err != nil {
     return todo, err
   }
