@@ -1,0 +1,47 @@
+# Gitファイル
+.git
+.gitignore
+.github
+
+# ドキュメント
+*.md
+README.md
+LICENSE
+
+# ビルド成果物
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+server
+
+# テストファイル
+*_test.go
+testdata/
+
+# 開発用ファイル
+.env
+.env.local
+.vscode/
+.idea/
+
+# ログファイル
+*.log
+
+# 一時ファイル
+tmp/
+temp/
+
+# Docker関連
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# OS固有のファイル
+.DS_Store
+Thumbs.db
