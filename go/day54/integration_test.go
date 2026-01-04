@@ -61,7 +61,7 @@ func TestMain(m *testing.M) {
 	// マイグレーションの実行
 	log.Println("Running migrations on test database...")
 	// まず、既存のマイグレーションをすべてダウンさせ、スキーマをクリーンな状態に戻す
-	migrateDownCmd := exec.Command("migrate", "-database", dsnForMigrate, "-path", "db/migrations", "down", "all")
+	migrateDownCmd := exec.Command("migrate", "-database", dsnForMigrate, "-path", "db/migrations", "down", "-all") // -all に変更
 	migrateDownCmd.Dir = ".."
 	if output, err := migrateDownCmd.CombinedOutput(); err != nil {
 		// エラーが発生しても続行（初回実行時など、ダウンするマイグレーションがない場合があるため）
