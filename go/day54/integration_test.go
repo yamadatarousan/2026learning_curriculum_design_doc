@@ -29,10 +29,10 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Could not start test database: %v", err)
 	}
 
-	// deferでテスト終了時に必ずDBコンテナを破棄する
+	// deferでテスト終了時に必ずDBコンテナとボリュームを破棄する
 	defer func() {
-		log.Println("Tearing down test database...")
-		cmd := exec.Command("docker-compose", "-f", "../../docker-compose.test.yml", "down")
+		log.Println("Tearing down test database and volumes...")
+		cmd := exec.Command("docker-compose", "-f", "../../docker-compose.test.yml", "down", "-v") // -v を追加
 		if err := cmd.Run(); err != nil {
 			log.Printf("Could not stop test database: %v", err)
 		}
@@ -120,7 +120,7 @@ func TestUserFlow(t *testing.T) {
 	// TestMainでseed.sqlがロードされているため、既存のユーザーを使用
 	loginBody := `{"email": "user-test@example.com", "password": "password123"}`
 	w := httptest.NewRecorder()
-	req, _ = http.NewRequest("POST", "/login", bytes.NewBufferString(loginBody))
+	req, _ := http.NewRequest("POST", "/login", bytes.NewBufferString(loginBody))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)

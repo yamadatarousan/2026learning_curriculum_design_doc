@@ -1,5 +1,5 @@
 -- パスワードはすべて 'password123'
--- bcrypt hash for 'password123': $2a$10$5K/yM.o1V..c5P5WHC2v5.k.b4D5Y2s3s4b5E6f7G8h9i0j1k2l3m
+-- bcrypt hash for 'password123': $2a$10$kxtxAB6YnV5vub0dbnc9z.DmL92hzshSp/X32LFR8G8//BxSx2Us6
 
 -- テナントはまだ導入していないので、ユーザーとTODOのみ作成
 

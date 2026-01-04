@@ -29,10 +29,10 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Could not start test database: %v", err)
 	}
 
-	// deferでテスト終了時に必ずDBコンテナを破棄する
+	// deferでテスト終了時に必ずDBコンテナとボリュームを破棄する
 	defer func() {
-		log.Println("Tearing down test database...")
-		cmd := exec.Command("docker-compose", "-f", "../../docker-compose.test.yml", "down")
+		log.Println("Tearing down test database and volumes...")
+		cmd := exec.Command("docker-compose", "-f", "../../docker-compose.test.yml", "down", "-v") // -v を追加
 		if err := cmd.Run(); err != nil {
 			log.Printf("Could not stop test database: %v", err)
 		}
