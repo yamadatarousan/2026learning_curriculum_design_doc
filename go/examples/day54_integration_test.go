@@ -120,7 +120,7 @@ func TestUserFlow(t *testing.T) {
 	// TestMainでseed.sqlがロードされているため、既存のユーザーを使用
 	loginBody := `{"email": "user-test@example.com", "password": "password123"}`
 	w := httptest.NewRecorder()
-	req, _ = http.NewRequest("POST", "/login", bytes.NewBufferString(loginBody))
+	req, _ := http.NewRequest("POST", "/login", bytes.NewBufferString(loginBody))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
