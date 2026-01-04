@@ -60,10 +60,18 @@ func TestMain(m *testing.M) {
 
 	// マイグレーションの実行
 	log.Println("Running migrations on test database...")
-	migrateCmd := exec.Command("migrate", "-database", dsnForMigrate, "-path", "db/migrations", "up")
-	// migrateコマンドはgoディレクトリで実行する必要があるため、実行ディレクトリを変更
-	migrateCmd.Dir = ".."
-	if output, err := migrateCmd.CombinedOutput(); err != nil {
+	// まず、既存のマイグレーションをすべてダウンさせ、スキーマをクリーンな状態に戻す
+	migrateDownCmd := exec.Command("migrate", "-database", dsnForMigrate, "-path", "db/migrations", "down", "all")
+	migrateDownCmd.Dir = ".."
+	if output, err := migrateDownCmd.CombinedOutput(); err != nil {
+		// エラーが発生しても続行（初回実行時など、ダウンするマイグレーションがない場合があるため）
+		log.Printf("Could not run migrate down (may be normal on first run): %v\nOutput: %s", err, string(output))
+	}
+
+	// その後、すべてのマイグレーションをアップする
+	migrateUpCmd := exec.Command("migrate", "-database", dsnForMigrate, "-path", "db/migrations", "up")
+	migrateUpCmd.Dir = ".."
+	if output, err := migrateUpCmd.CombinedOutput(); err != nil {
 		log.Fatalf("Could not run migrations: %v\nOutput: %s", err, string(output))
 	}
 
