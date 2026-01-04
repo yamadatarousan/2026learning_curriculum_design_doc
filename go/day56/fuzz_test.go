@@ -173,10 +173,10 @@ func FuzzParseUserAge(f *testing.F) {
 // 通常のテスト（fuzz testと併用可能）
 func TestParseEmail(t *testing.T) {
 	tests := []struct {
-		input         string
-		wantUsername  string
-		wantDomain    string
-		wantErr       bool
+		input        string
+		wantUsername string
+		wantDomain   string
+		wantErr      bool
 	}{
 		{"user@example.com", "user", "example.com", false},
 		{"test@test.co.jp", "test", "test.co.jp", false},
