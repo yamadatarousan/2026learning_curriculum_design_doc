@@ -39,7 +39,7 @@ type User struct {
 }
 
 var db *sql.DB
-var jwtSecret = []byte("a-very-secret-key")
+var jwtSecret []byte
 
 type AppClaims struct {
 	Role string `json:"role"`
@@ -276,11 +276,25 @@ func (h *AdminHandler) getAllUsers(c *gin.Context) error {
 	return nil
 }
 
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
 func initDB() {
 	var err error
 	// --- PostgreSQLへの接続情報 (DSN: Data Source Name) ---
-	// docker-compose.ymlで設定した値に合わせて接続文字列を作成します。
-	dsn := "host=localhost user=user password=password dbname=todo_db port=5433 sslmode=disable"
+	// 環境変数から接続情報を取得（Docker環境対応）
+	dbHost := getEnv("DB_HOST", "localhost")
+	dbPort := getEnv("DB_PORT", "5433")
+	dbUser := getEnv("DB_USER", "user")
+	dbPassword := getEnv("DB_PASSWORD", "password")
+	dbName := getEnv("DB_NAME", "todo_db")
+
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		dbHost, dbUser, dbPassword, dbName, dbPort)
 	db, err = sql.Open("pgx", dsn)
 	if err != nil {
 		log.Fatalf("Error opening database: %v", err)
@@ -304,6 +318,9 @@ func requestIDMiddleware() gin.HandlerFunc {
 }
 
 func main() {
+	// JWT秘密鍵を環境変数から読み取る
+	jwtSecret = []byte(getEnv("JWT_SECRET", "a-very-secret-key"))
+
 	initDB()
 
 	// --- 依存関係の構築 (DI: Dependency Injection) ---
