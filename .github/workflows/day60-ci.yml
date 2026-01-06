@@ -116,7 +116,7 @@ jobs:
           go-version: '1.24'
 
       - name: Build application (Day60)
-        run: go build -v -o ./bin/day60-app ./day60/main.go
+        run: go build -v -o ./bin/day60-app ./day60/
 
       - name: Run application (smoke test)
         run: |

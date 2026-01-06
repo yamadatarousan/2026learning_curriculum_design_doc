@@ -139,7 +139,8 @@ func TestUserFlow(t *testing.T) {
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 	var loginResponse map[string]string
-	json.Unmarshal(w.Body.Bytes(), &loginResponse)
+	err := json.Unmarshal(w.Body.Bytes(), &loginResponse)
+	assert.NoError(t, err)
 	token := loginResponse["token"]
 	assert.NotEmpty(t, token)
 
