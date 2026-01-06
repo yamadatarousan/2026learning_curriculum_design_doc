@@ -1,0 +1,126 @@
+# GitHub ActionsのCI（継続的インテグレーション）ワークフロー定義
+name: CI
+
+# ワークフローをトリガーするイベント
+on:
+  push:
+    branches: [ main, develop ]  # mainまたはdevelopブランチへのプッシュ時に実行
+  pull_request:
+    branches: [ main, develop ]  # mainまたはdevelopブランチへのプルリクエスト時に実行
+
+jobs:
+  # リント（コード品質チェック）ジョブ
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      # リポジトリのコードをチェックアウト
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Go言語の実行環境をセットアップ
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'  # Go 1.21を使用
+
+      # golangci-lintを実行してコード品質をチェック
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest  # 最新バージョンを使用
+          args: --timeout=5m  # タイムアウトを5分に設定
+
+  # テストジョブ
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    # テスト用のサービス（PostgreSQLデータベース）を起動
+    services:
+      postgres:
+        image: postgres:15  # PostgreSQL 15のDockerイメージを使用
+        env:
+          POSTGRES_USER: testuser  # テスト用ユーザー名
+          POSTGRES_PASSWORD: testpass  # テスト用パスワード
+          POSTGRES_DB: testdb  # テスト用データベース名
+        ports:
+          - 5432:5432  # ポート5432を公開
+        options: >-
+          --health-cmd pg_isready  # ヘルスチェックコマンド
+          --health-interval 10s  # ヘルスチェックの間隔
+          --health-timeout 5s  # ヘルスチェックのタイムアウト
+          --health-retries 5  # ヘルスチェックのリトライ回数
+
+    steps:
+      # リポジトリのコードをチェックアウト
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Go言語の実行環境をセットアップ
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'  # Go 1.21を使用
+
+      # Goモジュールのキャッシュを設定（ビルド時間を短縮）
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build  # ビルドキャッシュのパス
+            ~/go/pkg/mod  # モジュールキャッシュのパス
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}  # キャッシュキー（go.sumのハッシュ値を含む）
+          restore-keys: |
+            ${{ runner.os }}-go-  # 部分一致のキャッシュキー
+
+      # Go依存関係をダウンロード
+      - name: Download dependencies
+        run: go mod download
+
+      # 単体テストを実行（レースコンディションチェックとカバレッジ計測付き）
+      - name: Run unit tests
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable  # テスト用データベース接続URL
+
+      # テストカバレッジ結果をCodecovにアップロード
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.out  # カバレッジファイル
+          flags: unittests  # フラグ（ユニットテスト）
+          name: codecov-umbrella  # レポート名
+
+  # ビルドジョブ
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      # リポジトリのコードをチェックアウト
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Go言語の実行環境をセットアップ
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'  # Go 1.21を使用
+
+      # アプリケーションをビルド
+      - name: Build application
+        run: go build -v -o ./bin/app ./main.go
+
+      # ビルドしたアプリケーションを起動してスモークテストを実行
+      - name: Run application (smoke test)
+        run: |
+          timeout 5s ./bin/app || code=$?  # 5秒間アプリケーションを実行
+          if [ $code -eq 124 ]; then  # タイムアウトコード（正常起動）
+            echo "Application started successfully"
+            exit 0
+          else  # その他のエラーコード（起動失敗）
+            echo "Application failed to start"
+            exit 1
+          fi
+        env:
+          DATABASE_URL: sqlite://test.db  # テスト用SQLiteデータベースURL

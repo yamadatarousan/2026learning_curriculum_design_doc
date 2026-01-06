@@ -5,7 +5,7 @@
 - Go言語の学習カリキュラムは以下。
 - /Users/user/Development/2026learning_curriculum_design_doc/go_curriculum_day01-30.md
 - /Users/user/Development/2026learning_curriculum_design_doc/go_curriculum_day31-60.md
-- Go言語の学習はday53まで完了している。
+- Go言語の学習はday59まで完了している。
 - 学習の成果物は以下のディレクトリでday[n]に格納している。[n]の部分は何日目の成果物置き場なのかを示している
 - /Users/user/Development/2026learning_curriculum_design_doc/go/day[n]
 - 成果物は基本的に私がAIが出力したものを写経したりコピーしたりして作成する。
