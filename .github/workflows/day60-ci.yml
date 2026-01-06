@@ -1,4 +1,4 @@
-# Day60専用のGitHub Actions CI設定
+# Day60専用のGitHub Actions CI設定（共通go.mod対応版）
 name: CI - Day60
 
 # go/day60 配下の変更時のみ実行
@@ -7,11 +7,15 @@ on:
     branches: [ main, develop ]
     paths:
       - 'go/day60/**'  # day60ディレクトリの変更時のみトリガー
+      - 'go/go.mod'    # 共通go.modの変更時も
+      - 'go/go.sum'    # 共通go.sumの変更時も
       - '.github/workflows/day60-ci.yml'  # このファイル自体の変更時も
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'go/day60/**'
+      - 'go/go.mod'
+      - 'go/go.sum'
 
 jobs:
   lint:
@@ -19,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: go/day60  # day60ディレクトリで実行
+        working-directory: go  # goディレクトリで実行（go.modがある場所）
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,15 +37,15 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
-          working-directory: go/day60  # lintもday60で実行
-          args: --timeout=5m
+          working-directory: go
+          args: --timeout=5m ./day60/...  # day60配下のみlint
 
   test:
     name: Test (Day60)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: go/day60  # day60ディレクトリで実行
+        working-directory: go  # goディレクトリで実行（go.modがある場所）
 
     services:
       postgres:
@@ -73,22 +77,22 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-day60-${{ hashFiles('go/day60/go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('go/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-day60-
+            ${{ runner.os }}-go-
 
       - name: Download dependencies
         run: go mod download
 
-      - name: Run unit tests
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Run unit tests (Day60)
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./day60/...
         env:
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
         with:
-          file: ./go/day60/coverage.out
+          file: ./go/coverage.out
           flags: day60
           name: day60-coverage
 
@@ -97,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: go/day60  # day60ディレクトリで実行
+        working-directory: go  # goディレクトリで実行（go.modがある場所）
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -107,12 +111,12 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Build application
-        run: go build -v -o ./bin/app ./main.go
+      - name: Build application (Day60)
+        run: go build -v -o ./bin/day60-app ./day60/main.go
 
       - name: Run application (smoke test)
         run: |
-          timeout 5s ./bin/app || code=$?
+          timeout 5s ./bin/day60-app || code=$?
           if [ $code -eq 124 ]; then
             echo "Application started successfully"
             exit 0
