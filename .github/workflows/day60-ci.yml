@@ -1,15 +1,27 @@
-# Day60専用のGitHub Actions CI設定（共通go.mod対応版）
+# =============================================================================
+# Day60専用のGitHub Actions CI（継続的インテグレーション）ワークフロー定義
+# =============================================================================
+# このファイルは、go/day60配下のコード変更時に自動的にlint/test/buildを実行します
+# 共通のgo.mod（go/go.mod）を使用する構成に対応しています
+
+# ワークフロー名（GitHub Actionsのダッシュボードに表示される）
 name: CI - Day60
 
-# go/day60 配下の変更時のみ実行
+# =============================================================================
+# トリガー設定: いつこのワークフローを実行するか
+# =============================================================================
 on:
+  # mainまたはdevelopブランチへのプッシュ時
   push:
     branches: [ main, develop ]
     paths:
-      - 'go/day60/**'  # day60ディレクトリの変更時のみトリガー
-      - 'go/go.mod'    # 共通go.modの変更時も
-      - 'go/go.sum'    # 共通go.sumの変更時も
-      - '.github/workflows/day60-ci.yml'  # このファイル自体の変更時も
+      # 以下のいずれかのファイル/ディレクトリが変更された場合のみ実行
+      - 'go/day60/**'                       # day60配下の全ファイル（コード、テスト等）
+      - 'go/go.mod'                         # 共通のgo.mod（依存関係定義）
+      - 'go/go.sum'                         # 共通のgo.sum（依存関係のチェックサム）
+      - '.github/workflows/day60-ci.yml'    # このワークフローファイル自体
+
+  # mainまたはdevelopブランチへのプルリクエスト作成/更新時
   pull_request:
     branches: [ main, develop ]
     paths:
@@ -17,113 +29,187 @@ on:
       - 'go/go.mod'
       - 'go/go.sum'
 
+# =============================================================================
+# ジョブ定義: 並列実行される独立した処理単位
+# =============================================================================
 jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Lint（コード品質チェック）
+  # ---------------------------------------------------------------------------
+  # 目的: コードスタイル、潜在的なバグ、ベストプラクティス違反を検出
   lint:
-    name: Lint (Day60)
-    runs-on: ubuntu-latest
+    name: Lint (Day60)                      # ジョブの表示名
+    runs-on: ubuntu-latest                  # 実行環境（Ubuntu最新版）
+
+    # デフォルト設定: このジョブ内の全stepで適用される
     defaults:
       run:
-        working-directory: go  # goディレクトリで実行（go.modがある場所）
+        # working-directory: すべてのrunコマンドの実行ディレクトリ
+        # 重要: go.modがあるディレクトリで実行する必要がある
+        working-directory: go
+
     steps:
+      # --- Step 1: リポジトリのコードをチェックアウト ---
+      # GitHub Actionsのランナー（実行環境）にコードをダウンロード
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4           # 公式アクション（v4）を使用
 
+      # --- Step 2: Go言語の実行環境をセットアップ ---
+      # 指定したバージョンのGoをインストール
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v5           # 公式アクション（v5）を使用
         with:
-          go-version: '1.24'
+          go-version: '1.24'                # Go 1.24を使用（依存ライブラリの要求を満たす）
 
+      # --- Step 3: 依存関係をダウンロード ---
+      # go.modに記載された依存パッケージを事前にダウンロード
+      # これにより、lintツールが依存関係を解決できる
       - name: Download dependencies
         run: go mod download
 
+      # --- Step 4: golangci-lintを実行 ---
+      # 複数のlinterを統合したツールで、コード品質を総合的にチェック
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v3  # 公式アクション
         with:
-          version: latest
-          working-directory: go
-          args: --timeout=5m ./day60/...  # day60配下のみlint
+          version: latest                   # 最新バージョンを使用
+          working-directory: go             # goディレクトリで実行
+          args: --timeout=5m ./day60/...    # day60配下のみチェック、5分でタイムアウト
 
+  # ---------------------------------------------------------------------------
+  # Job 2: Test（単体テスト・結合テスト実行）
+  # ---------------------------------------------------------------------------
+  # 目的: コードの動作確認、バグ検出、カバレッジ計測
   test:
-    name: Test (Day60)
-    runs-on: ubuntu-latest
+    name: Test (Day60)                      # ジョブの表示名
+    runs-on: ubuntu-latest                  # 実行環境
+
     defaults:
       run:
-        working-directory: go  # goディレクトリで実行（go.modがある場所）
+        working-directory: go               # go.modがある場所で実行
 
+    # サービスコンテナ定義: このジョブと並行して起動するDockerコンテナ
     services:
+      # PostgreSQLデータベースコンテナ
       postgres:
-        image: postgres:15
+        image: postgres:15                  # PostgreSQL 15のDockerイメージ
         env:
-          POSTGRES_USER: testuser
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: testdb
+          # 環境変数でPostgreSQLを初期化
+          POSTGRES_USER: testuser           # テスト用ユーザー名
+          POSTGRES_PASSWORD: testpass       # テスト用パスワード
+          POSTGRES_DB: testdb               # テスト用データベース名
         ports:
-          - 5432:5432
+          - 5432:5432                       # ポート公開（ホスト:コンテナ）
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          # ヘルスチェック設定: コンテナが準備完了するまで待機
+          --health-cmd pg_isready           # PostgreSQL準備完了確認コマンド
+          --health-interval 10s             # 10秒ごとにチェック
+          --health-timeout 5s               # 5秒でタイムアウト
+          --health-retries 5                # 5回リトライ
 
     steps:
+      # --- Step 1: リポジトリのコードをチェックアウト ---
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # --- Step 2: Go言語の実行環境をセットアップ ---
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
 
+      # --- Step 3: Goモジュールのキャッシュ設定 ---
+      # 依存関係のダウンロード時間を短縮（2回目以降のビルドが高速化）
       - name: Cache Go modules
         uses: actions/cache@v3
         with:
           path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
+            ~/.cache/go-build              # ビルドキャッシュ
+            ~/go/pkg/mod                   # ダウンロード済みモジュール
+          # キャッシュキー: OS + go.sumのハッシュ値で一意に識別
           key: ${{ runner.os }}-go-${{ hashFiles('go/go.sum') }}
+          # 部分一致のキャッシュキー（完全一致がない場合に使用）
           restore-keys: |
             ${{ runner.os }}-go-
 
+      # --- Step 4: 依存関係をダウンロード ---
       - name: Download dependencies
         run: go mod download
 
+      # --- Step 5: 単体テストを実行 ---
+      # day60配下のテストのみを実行（他のdayには影響しない）
       - name: Run unit tests (Day60)
         run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./day60/...
+        # コマンドオプションの説明:
+        #   -v                  : 詳細な出力（テスト名、結果を表示）
+        #   -race               : レースコンディション検出（並行処理のバグ発見）
+        #   -coverprofile=...   : カバレッジ結果をファイルに出力
+        #   -covermode=atomic   : 並行実行に対応したカバレッジ計測モード
+        #   ./day60/...         : day60配下のすべてのパッケージ
         env:
+          # 環境変数: テストコード内で参照可能
           DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
-          SKIP_INTEGRATION: "true"  # integration testをスキップ
+          SKIP_INTEGRATION: "true"          # integration testをスキップ（docker-compose不要化）
 
+      # --- Step 6: カバレッジ結果をCodecovにアップロード ---
+      # Codecov: テストカバレッジを可視化・追跡するサービス
       - name: Upload coverage
         uses: codecov/codecov-action@v3
         with:
-          file: ./go/coverage.out
-          flags: day60
-          name: day60-coverage
+          file: ./go/coverage.out           # カバレッジファイルのパス
+          flags: day60                      # タグ（Codecov上でday60として識別）
+          name: day60-coverage              # レポート名
 
+  # ---------------------------------------------------------------------------
+  # Job 3: Build（アプリケーションのビルド）
+  # ---------------------------------------------------------------------------
+  # 目的: コンパイルが通ることを確認、実行可能バイナリを生成
   build:
-    name: Build (Day60)
-    runs-on: ubuntu-latest
+    name: Build (Day60)                     # ジョブの表示名
+    runs-on: ubuntu-latest                  # 実行環境
+
     defaults:
       run:
-        working-directory: go  # goディレクトリで実行（go.modがある場所）
+        working-directory: go               # go.modがある場所で実行
+
     steps:
+      # --- Step 1: リポジトリのコードをチェックアウト ---
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # --- Step 2: Go言語の実行環境をセットアップ ---
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
 
+      # --- Step 3: アプリケーションをビルド ---
+      # day60配下のすべての.goファイルをコンパイルして実行可能ファイルを生成
       - name: Build application (Day60)
         run: go build -v -o ./bin/day60-app ./day60/
+        # コマンドオプションの説明:
+        #   -v                : 詳細な出力（コンパイルされるパッケージ名を表示）
+        #   -o <path>         : 出力ファイルのパス指定
+        #   ./day60/          : パッケージディレクトリ（配下のすべての.goファイルを含む）
 
+      # --- Step 4: バイナリが正常に作成されたか確認 ---
+      # ビルド後の検証ステップ
       - name: Verify binary was created
         run: |
+          # バイナリファイルの存在チェック
           if [ -f ./bin/day60-app ]; then
             echo "Binary successfully created"
-            ls -lh ./bin/day60-app
+            ls -lh ./bin/day60-app          # ファイルサイズなどを表示
           else
             echo "Binary not found"
-            exit 1
+            exit 1                          # エラーで終了
           fi
+
+# =============================================================================
+# ワークフロー全体の動作
+# =============================================================================
+# 1. トリガー: go/day60配下、go.mod、go.sum、このファイルのいずれかが変更された場合
+# 2. 並行実行: lint、test、buildの3つのジョブが同時に実行される
+# 3. 各ジョブは独立しており、1つが失敗しても他のジョブは続行される
+# 4. すべてのジョブが成功（緑のチェックマーク）して初めてCIが通る
+# 5. 失敗した場合: GitHubのActionsページで詳細なログを確認できる
