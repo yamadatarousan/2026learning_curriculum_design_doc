@@ -1,0 +1,124 @@
+# Day60専用のGitHub Actions CI設定
+name: CI - Day60
+
+# go/day60 配下の変更時のみ実行
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'go/day60/**'  # day60ディレクトリの変更時のみトリガー
+      - '.github/workflows/day60-ci.yml'  # このファイル自体の変更時も
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'go/day60/**'
+
+jobs:
+  lint:
+    name: Lint (Day60)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go/day60  # day60ディレクトリで実行
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          working-directory: go/day60  # lintもday60で実行
+          args: --timeout=5m
+
+  test:
+    name: Test (Day60)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go/day60  # day60ディレクトリで実行
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-day60-${{ hashFiles('go/day60/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-day60-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run unit tests
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        env:
+          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./go/day60/coverage.out
+          flags: day60
+          name: day60-coverage
+
+  build:
+    name: Build (Day60)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go/day60  # day60ディレクトリで実行
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build application
+        run: go build -v -o ./bin/app ./main.go
+
+      - name: Run application (smoke test)
+        run: |
+          timeout 5s ./bin/app || code=$?
+          if [ $code -eq 124 ]; then
+            echo "Application started successfully"
+            exit 0
+          else
+            echo "Application failed to start"
+            exit 1
+          fi
+        env:
+          DATABASE_URL: sqlite://test.db
