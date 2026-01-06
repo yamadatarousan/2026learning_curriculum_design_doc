@@ -21,6 +21,12 @@ var testDB *sql.DB
 
 // TestMainは、パッケージ内のテストが実行される前に一度だけ呼ばれる特別な関数です。
 func TestMain(m *testing.M) {
+	// CI環境ではintegration testをスキップ
+	if os.Getenv("SKIP_INTEGRATION") != "" {
+		log.Println("Skipping integration tests (SKIP_INTEGRATION is set)")
+		os.Exit(0)
+	}
+
 	// --- セットアップ ---
 	log.Println("Spinning up test database...")
 	// --waitフラグでhealthcheckが通るまで待機
